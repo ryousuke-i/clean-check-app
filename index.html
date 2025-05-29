@@ -1,0 +1,64 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <title>清掃チェックAI</title>
+    <style>
+      body { font-family: sans-serif; text-align: center; padding: 20px; }
+      #label-container { margin-top: 20px; font-size: 1.5em; }
+    </style>
+  </head>
+  <body>
+    <h1>清掃チェックAI</h1>
+    <button onclick="init()">▶ カメラ起動（背面）</button>
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+    <script type="text/javascript">
+      const URL = "https://teachablemachine.withgoogle.com/models/nRLWNvRZR/";
+      let model, webcam, labelContainer, maxPredictions;
+
+      async function init() {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+
+        const flip = false; // 背面なので flip は false に
+        webcam = new tmImage.Webcam(200, 200, flip);
+
+        await webcam.setup({ facingMode: "environment" }); // ★アウトカメラ指定！
+        await webcam.play();
+        window.requestAnimationFrame(loop);
+
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+        labelContainer = document.getElementById("label-container");
+      }
+
+      async function loop() {
+        webcam.update();
+        await predict();
+        window.requestAnimationFrame(loop);
+      }
+
+      async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        prediction.sort((a, b) => b.probability - a.probability);
+        const top = prediction[0];
+
+        let message = "";
+        if (top.className === "冷蔵庫") {
+          message = "🧊 冷蔵庫：毎日清掃！フィルターもチェック！";
+        } else if (top.className === "換気扇") {
+          message = "🌀 換気扇：週1回ふたを外して清掃！";
+        } else {
+          message = "対象をカメラに映してください。";
+        }
+
+        labelContainer.innerText = message + `（信頼度: ${(top.probability * 100).toFixed(1)}%）`;
+      }
+    </script>
+  </body>
+</html>
